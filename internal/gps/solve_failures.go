@@ -369,6 +369,19 @@ func (e *checkeeHasProblemPackagesFailure) traceString() string {
 	return buf.String()
 }
 
+// canonicalImportPathFailure indicates that the dependee tries to import a
+// dependency via a path that is different from the one that the dependency
+// declares as its canonical.
+type canonicalImportPathFailure struct {
+	actual    string
+	canonical string
+}
+
+func (e *canonicalImportPathFailure) Error() string {
+	return fmt.Sprintf("Importing via a path different from the canonical path (got %q, want %q)",
+		e.actual, e.canonical)
+}
+
 // depHasProblemPackagesFailure indicates that the goal dependency was rejected
 // because there were problems with one or more of the packages the dependency
 // requires in the atom currently selected for that dependency. (This failure

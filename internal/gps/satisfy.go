@@ -35,7 +35,7 @@ func (s *solver) check(a atomWithPackages, pkgonly bool) error {
 		}
 	}
 
-	if err = s.checkRequiredPackagesExist(a); err != nil {
+	if err = s.checkImportRequirementsAreValid(a); err != nil {
 		return err
 	}
 
@@ -100,9 +100,9 @@ func (s *solver) checkAtomAllowable(pa atom) error {
 	return err
 }
 
-// checkRequiredPackagesExist ensures that all required packages enumerated by
+// checkImportRequirementsAreValid ensures that all required packages enumerated by
 // existing dependencies on this atom are actually present in the atom.
-func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
+func (s *solver) checkImportRequirementsAreValid(a atomWithPackages) error {
 	ptree, err := s.b.ListPackages(a.a.id, a.a.v)
 	if err != nil {
 		// TODO(sdboyer) handle this more gracefully
@@ -121,9 +121,22 @@ func (s *solver) checkRequiredPackagesExist(a atomWithPackages) error {
 				fp[pkg] = errdep
 			} else {
 				perr, has := ptree.Packages[pkg]
-				if !has || perr.Err != nil {
+				switch {
+				case !has:
+					fallthrough
+				case perr.Err != nil:
 					fp[pkg] = errDeppers{
 						err:     perr.Err,
+						deppers: []atom{dep.depender},
+					}
+				case perr.P.CommentPath != "" && pkg != perr.P.CommentPath:
+					// we have the package, but depender is trying to import it
+					// via non-canonical import path, so croak about it
+					fp[pkg] = errDeppers{
+						err: &canonicalImportPathFailure{
+							actual:    pkg,
+							canonical: perr.P.CommentPath,
+						},
 						deppers: []atom{dep.depender},
 					}
 				}
